@@ -1,0 +1,16 @@
+matching_groups:
+      - /api/playlist/.+/favorite
+      - /api/playlist/.+/update
+      - /api/playlist/.+/delete
+      - /api/playlist/.+
+sort: avg
+reverse: true
+metrics:
+  - count
+  - method
+  - uri
+  - min
+  - avg
+  - max
+  - sum
+file: /var/log/nginx/access.log
