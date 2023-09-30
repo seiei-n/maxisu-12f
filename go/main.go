@@ -11,10 +11,11 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"runtime"
 	"time"
+	_ "net/http/pprof"
 
 	
-	"github.com/pkg/profile"
 	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -52,7 +53,11 @@ type Handler struct {
 }
 
 func main() {
-	profile := profile.Start(profile.ProfilePath("/home/isucon/webapp/go/pprof"))
+	runtime.SetBlockProfileRate(1)
+	runtime.SetMutexProfileFraction(1)
+	go func() {
+		http.ListenAndServe("0.0.0.0:6060", nil)
+	}()
 	rand.Seed(time.Now().UnixNano())
 	time.Local = time.FixedZone("Local", 9*60*60)
 
@@ -81,10 +86,6 @@ func main() {
 	// utility
 	e.POST("/initialize", initialize)
 	e.GET("/health", h.health)
-	e.GET("/health/stop", func(c echo.Context) error {
-		profile.Stop()
-		return c.String(http.StatusOK, "stop")
-	})
 	// feature
 	API := e.Group("", h.apiMiddleware)
 	API.POST("/user", h.createUser)
