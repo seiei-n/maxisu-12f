@@ -53,8 +53,6 @@ type Handler struct {
 }
 
 func main() {
-	runtime.SetBlockProfileRate(1)
-	runtime.SetMutexProfileFraction(1)
 	go func() {
 		http.ListenAndServe("0.0.0.0:6060", nil)
 	}()
