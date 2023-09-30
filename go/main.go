@@ -81,14 +81,14 @@ func main() {
 	// utility
 	e.POST("/initialize", initialize)
 	e.GET("/health", h.health)
+	e.GET("/health/stop", func(c echo.Context) error {
+		profile.Stop()
+		return c.String(http.StatusOK, "stop")
+	})
 	// feature
 	API := e.Group("", h.apiMiddleware)
 	API.POST("/user", h.createUser)
 	API.POST("/login", h.login)
-	API.GET("/stop", func(c echo.Context) error {
-		profile.Stop()
-		return c.String(http.StatusOK, "stop")
-	})
 	sessCheckAPI := API.Group("", h.checkSessionMiddleware)
 	sessCheckAPI.GET("/user/:userID/gacha/index", h.listGacha)
 	sessCheckAPI.POST("/user/:userID/gacha/draw/:gachaID/:n", h.drawGacha)
