@@ -458,8 +458,8 @@ func (h *Handler) obtainPresent(tx *sqlx.Tx, userID int64, requestAt int64) ([]*
 		presentIDs[i] = np.ID
 	}
 
-	receivedHistory := make(map[int64]*UserPresentAllReceivedHistory)
-	query = "SELECT * FROM user_present_all_received_history WHERE user_id=? AND present_all_id IN (?)"
+	receivedHistory := make(map[int64]bool)
+	query = "SELECT id FROM user_present_all_received_history WHERE user_id=? AND present_all_id IN (?)"
 	query, args, err := sqlx.In(query, userID, presentIDs)
 	if err != nil {
 		return nil, err
@@ -474,14 +474,15 @@ func (h *Handler) obtainPresent(tx *sqlx.Tx, userID int64, requestAt int64) ([]*
 		if err := rows.StructScan(&history); err != nil {
 			return nil, err
 		}
-		receivedHistory[history.PresentAllID] = &history
+		receivedHistory[history.ID] = true
 	}
 
 	obtainPresents := make([]*UserPresent, 0)
 	for _, np := range normalPresents {
 		received := receivedHistory[np.ID] // received を取得
-    	if received != nil {
-    	    // プレゼント配布済
+		
+		// プレゼント配布済
+    	if !received {
     	    continue
     	}
 
