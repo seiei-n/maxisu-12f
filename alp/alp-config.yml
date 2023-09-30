@@ -1,8 +1,8 @@
 matching_groups:
-      - /api/playlist/.+/favorite
-      - /api/playlist/.+/update
-      - /api/playlist/.+/delete
-      - /api/playlist/.+
+      - /user/.+/gacha/.+
+      - /user/.+/present/.+
+      - /user/.+/card
+      - /user/.+/card/.+
 sort: avg
 reverse: true
 metrics:
