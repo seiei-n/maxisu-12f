@@ -1136,12 +1136,25 @@ func (h *Handler) drawGacha(c echo.Context) error {
 
 	// ガチャ提供割合(weight)の合計値を算出
 	var sum int64
-	err = h.DB.Get(&sum, "SELECT SUM(weight) FROM gacha_item_masters WHERE gacha_id=?", gachaID)
+
+	// gacha_id に関連する gacha_item_masters レコードをデータベースから取得
+	query = "SELECT weight FROM gacha_item_masters WHERE gacha_id = ?"
+	rows, err := h.DB.Query(query, gachaID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return errorResponse(c, http.StatusNotFound, err)
-		}
-		return errorResponse(c, http.StatusInternalServerError, err)
+	    if err == sql.ErrNoRows {
+	        return errorResponse(c, http.StatusNotFound, err)
+	    }
+	    return errorResponse(c, http.StatusInternalServerError, err)
+	}
+	defer rows.Close()
+
+	// 合計値を計算
+	for rows.Next() {
+	    var weight int64
+	    if err := rows.Scan(&weight); err != nil {
+	        return errorResponse(c, http.StatusInternalServerError, err)
+	    }
+	    sum += weight
 	}
 
 	// random値の導出 & 抽選
