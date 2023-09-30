@@ -28,8 +28,7 @@ pt:
 .PHONY: app-deploy
 app-deploy:
 	echo "Deploying app"
-	cd /home/isucon/webapp/go
-    go build -o isuconquest
+	cd /home/isucon/webapp/go && go build -o isuconquest
 	sudo systemctl stop isuconquest.go.service
 	sudo systemctl disable isuconquest.go.service
 	sudo systemctl start isuconquest.go.service
