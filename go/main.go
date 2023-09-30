@@ -14,6 +14,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/rs/xid"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
@@ -1147,7 +1148,9 @@ func (h *Handler) drawGacha(c echo.Context) error {
 	// random値の導出 & 抽選
 	result := make([]*GachaItemMaster, 0, gachaCount)
 	for i := 0; i < int(gachaCount); i++ {
-		random := rand.Int63n(sum)
+		// random := rand.Int63n(sum)
+		// xidで乱数生成
+		random := xid.New().Time().UnixNano() % sum
 		boundary := 0
 		for _, v := range gachaItemList {
 			boundary += v.Weight
@@ -1890,9 +1893,10 @@ func noContentResponse(c echo.Context, status int) error {
 	return c.NoContent(status)
 }
 
-// generateID ユニークなIDを生成する (今回はだるいからランダムな値を返すだけ)
-func (h *Handler) generateID() (int64, error) {
-    return rand.Int63(), nil
+// generateID ユニークなIDを生成する
+//use Xid
+func (h *Handler) generateID() (ID int64, err error) {
+    return  int64(xid.New().Counter()), nil
 }
 
 // generateUUID UUIDの生成
