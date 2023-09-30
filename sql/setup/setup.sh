@@ -3,6 +3,7 @@ set -x
 cd `dirname $0`
 
 ISUCON_DB_HOST=${ISUCON_DB_HOST:-localhost}
+ISUCON_DB_HOST_1=${ISUCON_DB_HOST_1:-localhost}
 ISUCON_DB_PORT=${ISUCON_DB_PORT:-3306}
 ISUCON_DB_USER=${ISUCON_DB_USER:-isucon}
 ISUCON_DB_PASSWORD=${ISUCON_DB_PASSWORD:-isucon}
@@ -17,12 +18,12 @@ sudo mysql -uroot \
 
 mysql -u"$ISUCON_DB_USER" \
 		-p"$ISUCON_DB_PASSWORD" \
-		--host "$ISUCON_DB_HOST" \
+		--host "$ISUCON_DB_HOST_1" \
 		--port "$ISUCON_DB_PORT" \
 		"$ISUCON_DB_NAME" < 1_schema.sql
 
 mysql -u"$ISUCON_DB_USER" \
 		-p"$ISUCON_DB_PASSWORD" \
-		--host "$ISUCON_DB_HOST" \
+		--host "$ISUCON_DB_HOST_1" \
 		--port "$ISUCON_DB_PORT" \
 		"$ISUCON_DB_NAME" < 2_init.sql
