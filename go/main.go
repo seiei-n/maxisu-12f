@@ -350,7 +350,7 @@ func (h *Handler) obtainLoginBonus(tx *sqlx.Tx, userID int64, requestAt int64) (
 		return nil, err
 	}
 
-	// プレゼント情報を一括で取得
+	// プレゼント情報とユーザーボーナス情報を一括で取得
 	bonusIDs := make([]int64, len(loginBonuses))
 	for i, bonus := range loginBonuses {
 		bonusIDs[i] = bonus.ID
@@ -373,6 +373,26 @@ func (h *Handler) obtainLoginBonus(tx *sqlx.Tx, userID int64, requestAt int64) (
 			return nil, err
 		}
 		userBonusMap[userBonus.LoginBonusID] = &userBonus
+	}
+
+	// ログインボーナスの報酬情報を一括で取得
+	rewardItemMap := make(map[int64][]*LoginBonusRewardMaster)
+	query = "SELECT * FROM login_bonus_reward_masters WHERE login_bonus_id IN (?)"
+	query, args, err = sqlx.In(query, bonusIDs)
+	if err != nil {
+		return nil, err
+	}
+	rows, err = tx.Queryx(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var rewardItem LoginBonusRewardMaster
+		if err := rows.StructScan(&rewardItem); err != nil {
+			return nil, err
+		}
+		rewardItemMap[rewardItem.LoginBonusID] = append(rewardItemMap[rewardItem.LoginBonusID], &rewardItem)
 	}
 
 	sendLoginBonuses := make([]*UserLoginBonus, 0)
@@ -401,7 +421,7 @@ func (h *Handler) obtainLoginBonus(tx *sqlx.Tx, userID int64, requestAt int64) (
 			userBonus.LastRewardSequence++
 		} else {
 			if bonus.Looped {
-				userBonus.LoopCount += 1
+				userBonus.LoopCount++
 				userBonus.LastRewardSequence = 1
 			} else {
 				// 上限まで付与完了しているボーナス
@@ -411,18 +431,16 @@ func (h *Handler) obtainLoginBonus(tx *sqlx.Tx, userID int64, requestAt int64) (
 		userBonus.UpdatedAt = requestAt
 
 		// 付与するリソース取得
-		rewardItem := new(LoginBonusRewardMaster)
-		query = "SELECT * FROM login_bonus_reward_masters WHERE login_bonus_id=? AND reward_sequence=?"
-		if err := tx.Get(rewardItem, query, bonus.ID, userBonus.LastRewardSequence); err != nil {
-			if err == sql.ErrNoRows {
-				return nil, ErrLoginBonusRewardNotFound
-			}
-			return nil, err
+		rewardItems, ok := rewardItemMap[bonus.ID]
+		if !ok || len(rewardItems) == 0 {
+			return nil, ErrLoginBonusRewardNotFound
 		}
 
-		_, _, _, err := h.obtainItem(tx, userID, rewardItem.ItemID, rewardItem.ItemType, rewardItem.Amount, requestAt)
-		if err != nil {
-			return nil, err
+		for _, rewardItem := range rewardItems {
+			_, _, _, err := h.obtainItem(tx, userID, rewardItem.ItemID, rewardItem.ItemType, rewardItem.Amount, requestAt)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		// 進捗の保存
