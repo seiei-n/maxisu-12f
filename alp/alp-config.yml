@@ -3,6 +3,7 @@ matching_groups:
       - /user/.+/present/.+
       - /user/.+/card
       - /user/.+/card/.+
+      - /user/.+/home
 sort: avg
 reverse: true
 metrics:
