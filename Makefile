@@ -8,7 +8,6 @@ rotate-access-log:
 	echo "Rotating access log"
 	sudo mv /var/log/nginx/access.log /var/log/nginx/access.log.$(shell date +%Y%m%d)
 	sudo systemctl restart nginx
-	
 
 .PHONY: rotate-slow-log
 rotate-slow-log:
@@ -24,6 +23,9 @@ alp:
 pt:
 	sudo pt-query-digest /var/log/mysql/mysql-slow.log
 
+.PHONY: pprof
+pprof:
+	go tool pprof -http=0.0.0.0:1080 http://localhost:6060/debug/pprof/profile
 
 .PHONY: app-deploy
 app-deploy:
@@ -32,4 +34,4 @@ app-deploy:
 	sudo systemctl stop isuconquest.go.service
 	sudo systemctl disable isuconquest.go.service
 	sudo systemctl start isuconquest.go.service
-	sudo systemctl enable isuconquest.go.service	
+	sudo systemctl enable isuconquest.go.service

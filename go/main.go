@@ -11,8 +11,11 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	_ "runtime"
 	"time"
+	_ "net/http/pprof"
 
+	
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -50,6 +53,9 @@ type Handler struct {
 }
 
 func main() {
+	go func() {
+		http.ListenAndServe("0.0.0.0:6060", nil)
+	}()
 	rand.Seed(time.Now().UnixNano())
 	time.Local = time.FixedZone("Local", 9*60*60)
 
@@ -78,7 +84,6 @@ func main() {
 	// utility
 	e.POST("/initialize", initialize)
 	e.GET("/health", h.health)
-
 	// feature
 	API := e.Group("", h.apiMiddleware)
 	API.POST("/user", h.createUser)
