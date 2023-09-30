@@ -97,7 +97,7 @@ func main() {
 	sessCheckAPI.POST("/user/:userID/reward", h.reward)
 	sessCheckAPI.GET("/user/:userID/home", h.home)
 
-	sessCheckAPI.GET("/stop", func(c echo.Context) error {
+	e.GET("/stop", func(c echo.Context) error {
 		profile.Stop()
 		return c.String(http.StatusOK, "stop")
 	})
