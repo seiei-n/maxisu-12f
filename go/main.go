@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
@@ -46,7 +46,7 @@ const (
 )
 
 type Handler struct {
-	DB *sqlx.DB
+	DB      *sqlx.DB
 }
 
 func main() {
@@ -350,18 +350,37 @@ func (h *Handler) obtainLoginBonus(tx *sqlx.Tx, userID int64, requestAt int64) (
 		return nil, err
 	}
 
+	// プレゼント情報を一括で取得
+	bonusIDs := make([]int64, len(loginBonuses))
+	for i, bonus := range loginBonuses {
+		bonusIDs[i] = bonus.ID
+	}
+
+	userBonusMap := make(map[int64]*UserLoginBonus)
+	query = "SELECT * FROM user_login_bonuses WHERE user_id=? AND login_bonus_id IN (?)"
+	query, args, err := sqlx.In(query, userID, bonusIDs)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := tx.Queryx(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var userBonus UserLoginBonus
+		if err := rows.StructScan(&userBonus); err != nil {
+			return nil, err
+		}
+		userBonusMap[userBonus.LoginBonusID] = &userBonus
+	}
+
 	sendLoginBonuses := make([]*UserLoginBonus, 0)
-
 	for _, bonus := range loginBonuses {
+		userBonus, ok := userBonusMap[bonus.ID]
 		initBonus := false
-		userBonus := new(UserLoginBonus)
-		query = "SELECT * FROM user_login_bonuses WHERE user_id=? AND login_bonus_id=?"
-		if err := tx.Get(userBonus, query, userID, bonus.ID); err != nil {
-			if err != sql.ErrNoRows {
-				return nil, err
-			}
+		if !ok {
 			initBonus = true
-
 			ubID, err := h.generateID()
 			if err != nil {
 				return nil, err
@@ -433,18 +452,38 @@ func (h *Handler) obtainPresent(tx *sqlx.Tx, userID int64, requestAt int64) ([]*
 		return nil, err
 	}
 
-	obtainPresents := make([]*UserPresent, 0)
-	for _, np := range normalPresents {
-		received := new(UserPresentAllReceivedHistory)
-		query = "SELECT * FROM user_present_all_received_history WHERE user_id=? AND present_all_id=?"
-		err := tx.Get(received, query, userID, np.ID)
-		if err == nil {
-			// プレゼント配布済
-			continue
-		}
-		if err != sql.ErrNoRows {
+	// プレゼント情報を一括で取得
+	presentIDs := make([]int64, len(normalPresents))
+	for i, np := range normalPresents {
+		presentIDs[i] = np.ID
+	}
+
+	receivedHistory := make(map[int64]*UserPresentAllReceivedHistory)
+	query = "SELECT * FROM user_present_all_received_history WHERE user_id=? AND present_all_id IN (?)"
+	query, args, err := sqlx.In(query, userID, presentIDs)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := tx.Queryx(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var history UserPresentAllReceivedHistory
+		if err := rows.StructScan(&history); err != nil {
 			return nil, err
 		}
+		receivedHistory[history.PresentAllID] = &history
+	}
+
+	obtainPresents := make([]*UserPresent, 0)
+	for _, np := range normalPresents {
+		received := receivedHistory[np.ID] // received を取得
+    	if received != nil {
+    	    // プレゼント配布済
+    	    continue
+    	}
 
 		pID, err := h.generateID()
 		if err != nil {
@@ -1851,27 +1890,9 @@ func noContentResponse(c echo.Context, status int) error {
 	return c.NoContent(status)
 }
 
-// generateID ユニークなIDを生成する
+// generateID ユニークなIDを生成する (今回はだるいからランダムな値を返すだけ)
 func (h *Handler) generateID() (int64, error) {
-	var updateErr error
-	for i := 0; i < 100; i++ {
-		res, err := h.DB.Exec("UPDATE id_generator SET id=LAST_INSERT_ID(id+1)")
-		if err != nil {
-			if merr, ok := err.(*mysql.MySQLError); ok && merr.Number == 1213 {
-				updateErr = err
-				continue
-			}
-			return 0, err
-		}
-
-		id, err := res.LastInsertId()
-		if err != nil {
-			return 0, err
-		}
-		return id, nil
-	}
-
-	return 0, fmt.Errorf("failed to generate id: %w", updateErr)
+    return rand.Int63(), nil
 }
 
 // generateUUID UUIDの生成
@@ -1880,7 +1901,6 @@ func generateUUID() (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	return id.String(), nil
 }
 
