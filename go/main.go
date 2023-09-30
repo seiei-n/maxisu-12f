@@ -47,6 +47,7 @@ const (
 
 type Handler struct {
 	DB      *sqlx.DB
+	DB2	    *sqlx.DB
 }
 
 func main() {
@@ -68,9 +69,17 @@ func main() {
 	}
 	defer dbx.Close()
 
+	dbx2, err := connectDB_2(false)
+	if err != nil {
+		e.Logger.Fatalf("failed to connect to db: %v", err)
+	}
+	defer dbx2.Close()
+
+
 	e.Server.Addr = fmt.Sprintf(":%v", "8080")
 	h := &Handler{
 		DB: dbx,
+		DB2: dbx2,
 	}
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{}))
@@ -126,6 +135,25 @@ func connectDB(batch bool) (*sqlx.DB, error) {
 	}
 	return dbx, nil
 }
+
+func connectDB_2(batch bool) (*sqlx.DB, error) {
+	dsn := fmt.Sprintf(
+		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=true&loc=%s&multiStatements=%t",
+		getEnv("ISUCON_DB_USER", "isucon"),
+		getEnv("ISUCON_DB_PASSWORD", "isucon"),
+		getEnv("ISUCON_DB_HOST_2", "127.0.0.1"),
+		getEnv("ISUCON_DB_PORT", "3306"),
+		getEnv("ISUCON_DB_NAME", "isucon"),
+		"Asia%2FTokyo",
+		batch,
+	)
+	dbx, err := sqlx.Open("mysql", dsn)
+	if err != nil {
+		return nil, err
+	}
+	return dbx, nil
+}
+
 
 // adminMiddleware 管理者ツール向けのmiddleware
 func (h *Handler) adminMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
@@ -234,7 +262,7 @@ func (h *Handler) checkSessionMiddleware(next echo.HandlerFunc) echo.HandlerFunc
 func (h *Handler) checkOneTimeToken(token string, tokenType int, requestAt int64) error {
 	tk := new(UserOneTimeToken)
 	query := "SELECT * FROM user_one_time_tokens WHERE token=? AND token_type=? AND deleted_at IS NULL"
-	if err := h.DB.Get(tk, query, token, tokenType); err != nil {
+	if err := h.DB2.Get(tk, query, token, tokenType); err != nil {
 		if err == sql.ErrNoRows {
 			return ErrInvalidToken
 		}
