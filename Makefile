@@ -24,6 +24,10 @@ alp:
 pt:
 	sudo pt-query-digest /var/log/mysql/mysql-slow.log
 
+.PHONY: pprof
+pprof:
+    # webは使わないお
+	go tool pprof main /home/isucon/webapp/go/pprof/cpu.pprof
 
 .PHONY: app-deploy
 app-deploy:
