@@ -25,8 +25,7 @@ pt:
 
 .PHONY: pprof
 pprof:
-    # webは使わないお
-	go tool pprof /home/isucon/webapp/go/isuconquest /home/isucon/webapp/go/pprof/cpu.pprof
+	go tool pprof -http=0.0.0.0:1080 /home/isucon/webapp/go/isuconquest http://localhost:6060/debug/pprof/profile
 
 .PHONY: app-deploy
 app-deploy:
