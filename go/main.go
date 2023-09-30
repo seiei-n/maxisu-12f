@@ -344,122 +344,138 @@ func isCompleteTodayLogin(lastActivatedAt, requestAt time.Time) bool {
 
 // obtainLoginBonus ログインボーナス付与
 func (h *Handler) obtainLoginBonus(tx *sqlx.Tx, userID int64, requestAt int64) ([]*UserLoginBonus, error) {
-	loginBonuses := make([]*LoginBonusMaster, 0)
-	query := "SELECT * FROM login_bonus_masters WHERE start_at <= ? AND end_at >= ?"
-	if err := tx.Select(&loginBonuses, query, requestAt, requestAt); err != nil {
-		return nil, err
-	}
+    loginBonuses := make([]*LoginBonusMaster, 0)
+    query := "SELECT * FROM login_bonus_masters WHERE start_at <= ? AND end_at >= ?"
+    if err := tx.Select(&loginBonuses, query, requestAt, requestAt); err != nil {
+        return nil, err
+    }
 
-	// プレゼント情報とユーザーボーナス情報を一括で取得
-	bonusIDs := make([]int64, len(loginBonuses))
-	for i, bonus := range loginBonuses {
-		bonusIDs[i] = bonus.ID
-	}
+    // プレゼント情報とユーザーボーナス情報を一括で取得
+    bonusIDs := make([]int64, len(loginBonuses))
+    for i, bonus := range loginBonuses {
+        bonusIDs[i] = bonus.ID
+    }
 
-	userBonusMap := make(map[int64]*UserLoginBonus)
-	query = "SELECT * FROM user_login_bonuses WHERE user_id=? AND login_bonus_id IN (?)"
-	query, args, err := sqlx.In(query, userID, bonusIDs)
-	if err != nil {
-		return nil, err
-	}
-	rows, err := tx.Queryx(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var userBonus UserLoginBonus
-		if err := rows.StructScan(&userBonus); err != nil {
-			return nil, err
-		}
-		userBonusMap[userBonus.LoginBonusID] = &userBonus
-	}
+    userBonusMap := make(map[int64]*UserLoginBonus)
+    query = "SELECT * FROM user_login_bonuses WHERE user_id=? AND login_bonus_id IN (?)"
+    query, args, err := sqlx.In(query, userID, bonusIDs)
+    if err != nil {
+        return nil, err
+    }
+    rows, err := tx.Queryx(query, args...)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    for rows.Next() {
+        var userBonus UserLoginBonus
+        if err := rows.StructScan(&userBonus); err != nil {
+            return nil, err
+        }
+        userBonusMap[userBonus.LoginBonusID] = &userBonus
+    }
 
-	// ログインボーナスの報酬情報を一括で取得
-	rewardItemMap := make(map[int64][]*LoginBonusRewardMaster)
-	query = "SELECT * FROM login_bonus_reward_masters WHERE login_bonus_id IN (?)"
-	query, args, err = sqlx.In(query, bonusIDs)
-	if err != nil {
-		return nil, err
-	}
-	rows, err = tx.Queryx(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var rewardItem LoginBonusRewardMaster
-		if err := rows.StructScan(&rewardItem); err != nil {
-			return nil, err
-		}
-		rewardItemMap[rewardItem.LoginBonusID] = append(rewardItemMap[rewardItem.LoginBonusID], &rewardItem)
-	}
+    // ログインボーナスの報酬情報を一括で取得
+    rewardItemMap := make(map[int64][]*LoginBonusRewardMaster)
 
-	sendLoginBonuses := make([]*UserLoginBonus, 0)
-	for _, bonus := range loginBonuses {
-		userBonus, ok := userBonusMap[bonus.ID]
-		initBonus := false
-		if !ok {
-			initBonus = true
-			ubID, err := h.generateID()
-			if err != nil {
-				return nil, err
-			}
-			userBonus = &UserLoginBonus{
-				ID:                 ubID,
-				UserID:             userID,
-				LoginBonusID:       bonus.ID,
-				LastRewardSequence: 0,
-				LoopCount:          1,
-				CreatedAt:          requestAt,
-				UpdatedAt:          requestAt,
-			}
-		}
+    // login_bonus_idのスライスとreward_sequenceのスライスを作成
+    var bonusIDSlice []int64
+    var rewardSequenceSlice []int
 
-		// ボーナス進捗更新
-		if userBonus.LastRewardSequence < bonus.ColumnCount {
-			userBonus.LastRewardSequence++
-		} else {
-			if bonus.Looped {
-				userBonus.LoopCount++
-				userBonus.LastRewardSequence = 1
-			} else {
-				// 上限まで付与完了しているボーナス
-				continue
-			}
-		}
-		userBonus.UpdatedAt = requestAt
+    for _, bonus := range loginBonuses {
+        bonusIDSlice = append(bonusIDSlice, bonus.ID)
+        userBonus, ok := userBonusMap[bonus.ID]
+        if !ok {
+            rewardSequenceSlice = append(rewardSequenceSlice, 0) // ユーザーボーナスが存在しない場合
+        } else {
+            rewardSequenceSlice = append(rewardSequenceSlice, userBonus.LastRewardSequence)
+        }
+    }
 
-		// 付与するリソース取得
-		rewardItems, ok := rewardItemMap[bonus.ID]
-		if !ok || len(rewardItems) == 0 {
-			return nil, ErrLoginBonusRewardNotFound
-		}
+    query = "SELECT * FROM login_bonus_reward_masters WHERE login_bonus_id IN (?) AND reward_sequence IN (?)"
+    query, args, err = sqlx.In(query, bonusIDSlice, rewardSequenceSlice)
+    if err != nil {
+        return nil, err
+    }
+    rows, err = tx.Queryx(query, args...)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
 
-		for _, rewardItem := range rewardItems {
+    for rows.Next() {
+        var rewardItem LoginBonusRewardMaster
+        if err := rows.StructScan(&rewardItem); err != nil {
+            return nil, err
+        }
+        rewardItemMap[rewardItem.LoginBonusID] = append(rewardItemMap[rewardItem.LoginBonusID], &rewardItem)
+    }
+
+    sendLoginBonuses := make([]*UserLoginBonus, 0)
+    for _, bonus := range loginBonuses {
+        userBonus, ok := userBonusMap[bonus.ID]
+        initBonus := false
+        if !ok {
+            initBonus = true
+            ubID, err := h.generateID()
+            if err != nil {
+                return nil, err
+            }
+            userBonus = &UserLoginBonus{
+                ID:                 ubID,
+                UserID:             userID,
+                LoginBonusID:       bonus.ID,
+                LastRewardSequence: 0,
+                LoopCount:          1,
+                CreatedAt:          requestAt,
+                UpdatedAt:          requestAt,
+            }
+        }
+
+        // ボーナス進捗更新
+        if userBonus.LastRewardSequence < bonus.ColumnCount {
+            userBonus.LastRewardSequence++
+        } else {
+            if bonus.Looped {
+                userBonus.LoopCount++
+                userBonus.LastRewardSequence = 1
+            } else {
+                // 上限まで付与完了しているボーナス
+                continue
+            }
+        }
+        userBonus.UpdatedAt = requestAt
+
+        // 付与するリソース取得
+        rewardItems, ok := rewardItemMap[bonus.ID]
+        if !ok || len(rewardItems) == 0 {
+            return nil, ErrLoginBonusRewardNotFound
+        }
+
+        for _, rewardItem := range rewardItems {
 			_, _, _, err := h.obtainItem(tx, userID, rewardItem.ItemID, rewardItem.ItemType, rewardItem.Amount, requestAt)
-			if err != nil {
-				return nil, err
-			}
-		}
+            if err != nil {
+                return nil, err
+            }
+        }
 
-		// 進捗の保存
-		if initBonus {
-			query = "INSERT INTO user_login_bonuses(id, user_id, login_bonus_id, last_reward_sequence, loop_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-			if _, err = tx.Exec(query, userBonus.ID, userBonus.UserID, userBonus.LoginBonusID, userBonus.LastRewardSequence, userBonus.LoopCount, userBonus.CreatedAt, userBonus.UpdatedAt); err != nil {
-				return nil, err
-			}
-		} else {
-			query = "UPDATE user_login_bonuses SET last_reward_sequence=?, loop_count=?, updated_at=? WHERE id=?"
-			if _, err = tx.Exec(query, userBonus.LastRewardSequence, userBonus.LoopCount, userBonus.UpdatedAt, userBonus.ID); err != nil {
-				return nil, err
-			}
-		}
+        // 進捗の保存
+        if initBonus {
+            query = "INSERT INTO user_login_bonuses(id, user_id, login_bonus_id, last_reward_sequence, loop_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+            if _, err = tx.Exec(query, userBonus.ID, userBonus.UserID, userBonus.LoginBonusID, userBonus.LastRewardSequence, userBonus.LoopCount, userBonus.CreatedAt, userBonus.UpdatedAt); err != nil {
+                return nil, err
+            }
+        } else {
+            query = "UPDATE user_login_bonuses SET last_reward_sequence=?, loop_count=?, updated_at=? WHERE id=?"
+            if _, err = tx.Exec(query, userBonus.LastRewardSequence, userBonus.LoopCount, userBonus.UpdatedAt, userBonus.ID); err != nil {
+                return nil, err
+            }
+        }
 
-		sendLoginBonuses = append(sendLoginBonuses, userBonus)
-	}
+        sendLoginBonuses = append(sendLoginBonuses, userBonus)
+    }
 
-	return sendLoginBonuses, nil
+    return sendLoginBonuses, nil
 }
 
 // obtainPresent プレゼント付与
