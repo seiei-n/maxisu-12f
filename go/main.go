@@ -81,6 +81,10 @@ func main() {
 	// utility
 	e.POST("/initialize", initialize)
 	e.GET("/health", h.health)
+	e.GET("/stop", func(c echo.Context) error {
+		profile.Stop()
+		return c.String(http.StatusOK, "stop")
+	})
 
 	// feature
 	API := e.Group("", h.apiMiddleware)
@@ -96,11 +100,6 @@ func main() {
 	sessCheckAPI.POST("/user/:userID/card", h.updateDeck)
 	sessCheckAPI.POST("/user/:userID/reward", h.reward)
 	sessCheckAPI.GET("/user/:userID/home", h.home)
-
-	e.GET("/stop", func(c echo.Context) error {
-		profile.Stop()
-		return c.String(http.StatusOK, "stop")
-	})
 
 	// admin
 	adminAPI := e.Group("", h.adminMiddleware)
