@@ -591,7 +591,7 @@ func (h *Handler) obtainItem(tx *sqlx.Tx, userID, itemID int64, itemType int, ob
 		obtainCards = append(obtainCards, card)
 
 	case 3, 4: // 強化素材
-		query := "SELECT * FROM item_masters WHERE id=? AND item_type=?"
+		query := "SELECT id, item_type FROM item_masters WHERE id=? AND item_type=?"
 		item := new(ItemMaster)
 		if err := tx.Get(item, query, itemID, itemType); err != nil {
 			if err == sql.ErrNoRows {
@@ -600,7 +600,7 @@ func (h *Handler) obtainItem(tx *sqlx.Tx, userID, itemID int64, itemType int, ob
 			return nil, nil, nil, err
 		}
 
-		query = "SELECT id, item_type FROM user_items WHERE user_id=? AND item_id=?"
+		query = "SELECT id, item_id, item_type, amount FROM user_items WHERE user_id=? AND item_id=?"
 		uitem := new(UserItem)
 		if err := tx.Get(uitem, query, userID, item.ID); err != nil {
 			if err != sql.ErrNoRows {
