@@ -11,7 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"runtime"
+	_ "runtime"
 	"time"
 	_ "net/http/pprof"
 
