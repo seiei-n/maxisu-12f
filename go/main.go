@@ -545,7 +545,7 @@ func (h *Handler) obtainItem(tx *sqlx.Tx, userID, itemID int64, itemType int, ob
 	switch itemType {
 	case 1: // coin
 		user := new(User)
-		query := "SELECT * FROM users WHERE id=?"
+		query := "SELECT id, isu_coin FROM users WHERE id=?"
 		if err := tx.Get(user, query, userID); err != nil {
 			if err == sql.ErrNoRows {
 				return nil, nil, nil, ErrUserNotFound
@@ -561,7 +561,7 @@ func (h *Handler) obtainItem(tx *sqlx.Tx, userID, itemID int64, itemType int, ob
 		obtainCoins = append(obtainCoins, obtainAmount)
 
 	case 2: // card(ハンマー)
-		query := "SELECT * FROM item_masters WHERE id=? AND item_type=?"
+		query := "SELECT id FROM item_masters WHERE id=? AND item_type=?"
 		item := new(ItemMaster)
 		if err := tx.Get(item, query, itemID, itemType); err != nil {
 			if err == sql.ErrNoRows {
@@ -600,7 +600,7 @@ func (h *Handler) obtainItem(tx *sqlx.Tx, userID, itemID int64, itemType int, ob
 			return nil, nil, nil, err
 		}
 
-		query = "SELECT * FROM user_items WHERE user_id=? AND item_id=?"
+		query = "SELECT id, item_type FROM user_items WHERE user_id=? AND item_id=?"
 		uitem := new(UserItem)
 		if err := tx.Get(uitem, query, userID, item.ID); err != nil {
 			if err != sql.ErrNoRows {
