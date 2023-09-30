@@ -25,7 +25,7 @@ pt:
 
 .PHONY: pprof
 pprof:
-	go tool pprof -http=0.0.0.0:1080 /home/isucon/webapp/go/isuconquest http://localhost:6060/debug/pprof/profile
+	go tool pprof -http=0.0.0.0:1080 http://localhost:6060/debug/pprof/profile
 
 .PHONY: app-deploy
 app-deploy:
