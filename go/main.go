@@ -433,18 +433,38 @@ func (h *Handler) obtainPresent(tx *sqlx.Tx, userID int64, requestAt int64) ([]*
 		return nil, err
 	}
 
-	obtainPresents := make([]*UserPresent, 0)
-	for _, np := range normalPresents {
-		received := new(UserPresentAllReceivedHistory)
-		query = "SELECT * FROM user_present_all_received_history WHERE user_id=? AND present_all_id=?"
-		err := tx.Get(received, query, userID, np.ID)
-		if err == nil {
-			// プレゼント配布済
-			continue
-		}
-		if err != sql.ErrNoRows {
+	// プレゼント情報を一括で取得
+	presentIDs := make([]int64, len(normalPresents))
+	for i, np := range normalPresents {
+		presentIDs[i] = np.ID
+	}
+
+	receivedHistory := make(map[int64]*UserPresentAllReceivedHistory)
+	query = "SELECT * FROM user_present_all_received_history WHERE user_id=? AND present_all_id IN (?)"
+	query, args, err := sqlx.In(query, userID, presentIDs)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := tx.Queryx(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var history UserPresentAllReceivedHistory
+		if err := rows.StructScan(&history); err != nil {
 			return nil, err
 		}
+		receivedHistory[history.PresentAllID] = &history
+	}
+
+	obtainPresents := make([]*UserPresent, 0)
+	for _, np := range normalPresents {
+		received := receivedHistory[np.ID] // received を取得
+    	if received != nil {
+    	    // プレゼント配布済
+    	    continue
+    	}
 
 		pID, err := h.generateID()
 		if err != nil {
