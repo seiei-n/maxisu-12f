@@ -27,7 +27,7 @@ pt:
 .PHONY: pprof
 pprof:
     # webは使わないお
-	go tool pprof main /home/isucon/webapp/go/pprof/cpu.pprof
+	go tool pprof /home/isucon/webapp/go/main /home/isucon/webapp/go/pprof/cpu.pprof
 
 .PHONY: app-deploy
 app-deploy:
