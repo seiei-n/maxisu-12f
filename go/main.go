@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"time"
 
+	
+	"github.com/pkg/profile"
 	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -50,6 +52,7 @@ type Handler struct {
 }
 
 func main() {
+	profile := profile.Start(profile.ProfilePath("/home/isucon/webapp/go/pprof"))
 	rand.Seed(time.Now().UnixNano())
 	time.Local = time.FixedZone("Local", 9*60*60)
 
@@ -93,6 +96,11 @@ func main() {
 	sessCheckAPI.POST("/user/:userID/card", h.updateDeck)
 	sessCheckAPI.POST("/user/:userID/reward", h.reward)
 	sessCheckAPI.GET("/user/:userID/home", h.home)
+
+	sessCheckAPI.GET("/stop", func(c echo.Context) error {
+		profile.Stop()
+		return c.String(http.StatusOK, "stop")
+	})
 
 	// admin
 	adminAPI := e.Group("", h.adminMiddleware)
