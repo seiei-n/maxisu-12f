@@ -510,15 +510,23 @@ func (h *Handler) obtainPresent(tx *sqlx.Tx, userID int64, requestAt int64) ([]*
 		if err != nil {
 			return nil, err
 		}
+		history := &UserPresentAllReceivedHistory{
+			ID:           phID,
+			UserID:       userID,
+			PresentAllID: np.ID,
+			ReceivedAt:   requestAt,
+			CreatedAt:    requestAt,
+			UpdatedAt:    requestAt,
+		}
 		query = "INSERT INTO user_present_all_received_history(id, user_id, present_all_id, received_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
 		if _, err := tx.Exec(
 			query,
-			phID,
-			userID,
-			np.ID,
-			requestAt,
-			requestAt,
-			requestAt,
+			history.ID,
+			history.UserID,
+			history.PresentAllID,
+			history.ReceivedAt,
+			history.CreatedAt,
+			history.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -2046,6 +2054,16 @@ type UserPresent struct {
 	CreatedAt      int64  `json:"createdAt" db:"created_at"`
 	UpdatedAt      int64  `json:"updatedAt" db:"updated_at"`
 	DeletedAt      *int64 `json:"deletedAt,omitempty" db:"deleted_at"`
+}
+
+type UserPresentAllReceivedHistory struct {
+	ID           int64  `json:"id" db:"id"`
+	UserID       int64  `json:"userId" db:"user_id"`
+	PresentAllID int64  `json:"presentAllId" db:"present_all_id"`
+	ReceivedAt   int64  `json:"receivedAt" db:"received_at"`
+	CreatedAt    int64  `json:"createdAt" db:"created_at"`
+	UpdatedAt    int64  `json:"updatedAt" db:"updated_at"`
+	DeletedAt    *int64 `json:"deletedAt,omitempty" db:"deleted_at"`
 }
 
 type UserPresentID struct {
